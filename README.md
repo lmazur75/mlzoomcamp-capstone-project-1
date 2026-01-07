@@ -236,15 +236,10 @@ docker run -p 9696:9696 predict-engine-condition
 ### Test the deployment:
 
 ```bash
-curl http://localhost:9696/health
+curl http://localhost:9696 -UseBasicParsing
 ```
 
 ## API Endpoints
-
-### Health Check
-- **URL**: `/health`
-- **Method**: GET
-- **Response**: `{"status": "healthy", "model_loaded": true}`
 
 ### Root
 - **URL**: `/`
@@ -258,19 +253,24 @@ curl http://localhost:9696/health
 - **Request Body**:
 ```json
 {
-  "engine_rpm": 700,
-  "lub_oil_pressure": 2.5,
-  "fuel_pressure": 11.8,
-  "coolant_pressure": 3.2,
-  "lub_oil_temp": 84.1,
-  "coolant_temp": 81.6
+  "twf": 0,
+  "hdf": 0,
+  "pwf": 0,
+  "osf": 0,
+  "rnf": 0,
+  "air_temperature_[k]": 300,
+  "process_temperature_[k]": 310,
+  "rotational_speed_[rpm]": 1538,
+  "torque_[nm]": 40,
+  "tool_wear_[min]": 108,
+  "type": "L"
 }
 ```
 ### Use index.html for a simple frontend
 
 - Open index.html in your browser and it will send a GET request to http://localhost:9696/predict
 
-![alt text](image.png)
+![alt text](prediction_example.png)
 
 ### Interactive Documentation
 - **Swagger UI**: `/docs`
@@ -282,19 +282,27 @@ curl http://localhost:9696/health
 Contains project metadata and dependencies:
 ```toml
 [project]
-name = "engine-health-prediction"
+name = "capstone-project-1"
 version = "0.1.0"
-requires-python = ">=3.9"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
 dependencies = [
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "scikit-learn>=1.3.0",
-    "xgboost>=2.0.0",
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "joblib>=1.3.0",
-    "pydantic>=2.0.0",
+    "fastapi>=0.120.0",
+    "matplotlib>=3.10.8",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.6.1",
+    "seaborn>=0.13.2",
+    "uvicorn>=0.38.0",
+    "xgboost>=3.1.1",
 ]
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+]
+
 ```
 
 ### Dockerfile
@@ -318,7 +326,7 @@ ENV PATH="/code/.venv/bin:$PATH"
 # pyproject.toml     → project metadata and dependencies
 # uv.lock            → locked dependency versions (for reproducibility)
 # .python-version    → Python version specification
-COPY "pyproject.toml" "uv.lock" ".python-version" ./
+COPY "pyproject.toml" "uv.lock" ./
 
 # Install dependencies exactly as locked in uv.lock, without updating them
 RUN uv lock && uv sync --locked
@@ -388,214 +396,12 @@ The notebook contains:
    - Cross-validation with StratifiedKFold
    - Select best performing model (XGBoost)
 
-4. **Model Training** (`train.py`)
+4. **Model Training** (`model.bin`)
    - Train final model with best parameters
    - Save model to disk
 
 5. **Deployment** (`predict.py`, `Dockerfile`)
    - FastAPI service for real-time predictions
    - Docker containerization
-
-## Why uv?
-
-This project uses [uv](https://github.com/astral-sh/uv) as the package manager because:
-
-- **Speed**: 10-100x faster than pip
-- **Reliability**: Consistent dependency resolution
-- **Simplicity**: Drop-in replacement for pip
-- **Modern**: Built in Rust with modern Python packaging standards
-- **Compatibility**: Works with existing pip/PyPI ecosystem
-
-## FastAPI Benefits
-
-This project uses FastAPI instead of Flask because:
-
-- **Automatic API Documentation**: Interactive docs at `/docs` and `/redoc`
-- **Type Safety**: Built-in request/response validation with Pydantic
-- **Modern**: Async support, WebSocket support
-- **Performance**: One of the fastest Python frameworks
-- **Developer Experience**: Better error messages and IDE support
-
-## Example Code Snippets
-
-### train.py (simplified)
-
-```python
-import pandas as pd
-import joblib
-from sklearn.model_selection import train_test_split
-import xgboost as xgb
-
-# Load data
-df = pd.read_csv('engine_data.csv')
-df.columns = df.columns.str.strip().str.replace(' ','_').str.lower()
-
-# Prepare features
-X = df.drop("engine_condition", axis=1)
-y = df["engine_condition"]
-
-# Split data
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.20, stratify=y, random_state=42
-)
-
-# Train model
-model = xgb.XGBClassifier(
-    learning_rate=0.1,
-    max_depth=3,
-    n_estimators=100,
-    subsample=1.0,
-    random_state=42,
-    eval_metric='logloss',
-    use_label_encoder=False
-)
-
-model.fit(X_train, y_train)
-
-# Save model
-joblib.dump(model, 'model.bin')
-print("Model saved successfully!")
-```
-
-### predict.py (simplified)
-
-```python
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-import joblib
-import numpy as np
-
-app = FastAPI(title="Engine Health Prediction API")
-
-# Load model
-model = joblib.load('model.bin')
-
-class EngineData(BaseModel):
-    engine_rpm: float = Field(..., gt=0)
-    lub_oil_pressure: float = Field(..., ge=0)
-    fuel_pressure: float = Field(..., ge=0)
-    coolant_pressure: float = Field(..., ge=0)
-    lub_oil_temp: float = Field(..., gt=0)
-    coolant_temp: float = Field(..., gt=0)
-
-@app.get("/")
-def read_root():
-    return {"message": "Engine Health Prediction API"}
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "model_loaded": True}
-
-@app.post("/predict")
-def predict(data: EngineData):
-    features = np.array([[
-        data.engine_rpm,
-        data.lub_oil_pressure,
-        data.fuel_pressure,
-        data.coolant_pressure,
-        data.lub_oil_temp,
-        data.coolant_temp
-    ]])
-    
-    prediction = int(model.predict(features)[0])
-    confidence = float(model.predict_proba(features)[0].max())
-    
-    return {
-        "prediction": prediction,
-        "condition": "Good" if prediction == 1 else "Maintenance Needed",
-        "confidence": round(confidence, 4),
-        "input_data": data.dict()
-    }
-```
-
-## Future Improvements
-
-1. **Model Enhancement**
-   - Collect more data for better accuracy
-   - Feature engineering (interaction features, polynomial features)
-   - Try ensemble methods
-   - Address class imbalance if present
-
-2. **API Enhancements**
-   - Add authentication (OAuth2, API keys)
-   - Implement rate limiting
-   - Add batch prediction endpoint
-   - Include confidence intervals
-   - Add model versioning
-
-3. **Monitoring**
-   - Add logging and metrics
-   - Model performance tracking
-   - Alert system for anomalies
-   - Integration with monitoring tools (Prometheus, Grafana)
-
-4. **Testing**
-   - Unit tests for API endpoints
-   - Integration tests
-   - Load testing
-   - Model drift detection
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Model file not found**
-   - Ensure you run `train.py` before starting the API
-   - Check that `model.bin` exists in the project directory
-
-2. **Port already in use**
-   - Change the port: `uvicorn predict:app --port 8001`
-   - Or kill the process using port 8000
-
-3. **uv not found**
-   - Install uv: `pip install uv`
-   - Or use the installation script from the official website
-
-4. **Dependencies issues**
-   - Regenerate lock file: `uv pip compile pyproject.toml -o requirements.txt`
-   - Clear cache: `uv cache clean`
-
-## Performance Benchmarks
-
-- **Prediction latency**: ~5-10ms per request
-- **Throughput**: ~100-200 requests/second (single worker)
-- **Memory usage**: ~200-300MB
-- **Model size**: ~100KB
-
-## License
-
-This project is available under the MIT License.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Setup
-
-```bash
-git clone https://github.com/lmazur75/mlzoomcamp-midterm-project
-cd mlzoomcamp-midterm-project
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
-
-### Running Tests
-
-```bash
-pytest tests/
-```
-
-## Contact
-
-For questions or feedback, please open an issue in the repository.
-
-## Acknowledgments
-
-- Dataset provided by [Kaggle](https://www.kaggle.com/datasets/loveall/automotive-vehicles-engine-health-dataset)
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- Package management with [uv](https://github.com/astral-sh/uv)
-
----
 
 **Note**: This project is for educational and demonstration purposes. For production use, additional testing, validation, and monitoring should be implemented.

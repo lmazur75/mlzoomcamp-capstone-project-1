@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Machine Failure Predictor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(to bottom right, #e0e7ff, #f9fafb);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    h2 {
+      color: #1e3a8a;
+      margin-bottom: 20px;
+    }
+    form {
+      background: #ffffff;
+      padding: 25px 30px;
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    label {
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      border-color: #2563eb;
+      outline: none;
+    }
+    button {
+      padding: 10px;
+      margin-top: 10px;
+      background-color: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 600;
+      transition: background-color 0.2s;
+    }
+    button:hover {
+      background-color: #1e40af;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 17px;
+      font-weight: 600;
+      text-align: center;
+    }
+    #result.good {
+      color: #16a34a;
+    }
+    #result.bad {
+      color: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <h2>Machine Failure Predictor</h2>
+  <form id="predictForm">
+    <div>
+      <label for="twf">TWF (Tool Wear Failure)</label>
+      <input type="number" id="twf" name="twf" min="0" max="1" value="0" required />
+    </div>
+    <div>
+      <label for="hdf">HDF (Heat Dissipation Failure)</label>
+      <input type="number" id="hdf" name="hdf" min="0" max="1" value="0" />
+    </div>
+    <div>
+      <label for="pwf">PWF (Power Failure)</label>
+      <input type="number" id="pwf" name="pwf" min="0" max="1" value="0" />
+    </div>
+    <div>
+      <label for="osf">OSF (Overstrain Failure)</label>
+      <input type="number" id="osf" name="osf" min="0" max="1" value="0" />
+    </div>
+    <div>
+      <label for="rnf">RNF (Random Failure)</label>
+      <input type="number" id="rnf" name="rnf" min="0" max="1" value="0" />
+    </div>
+    <button type="submit">Check Failure</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    document.getElementById("predictForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const resultEl = document.getElementById("result");
+      resultEl.textContent = "Predicting...";
+      resultEl.className = "";
+
+      // Collect form data
+      const data = {
+        twf: parseInt(document.getElementById("twf").value) || 0,
+        hdf: parseInt(document.getElementById("hdf").value) || 0,
+        pwf: parseInt(document.getElementById("pwf").value) || 0,
+        osf: parseInt(document.getElementById("osf").value) || 0,
+        rnf: parseInt(document.getElementById("rnf").value) || 0
+      };
+
+      console.log("Sending data:", data);
+
+      try {
+        const response = await fetch("http://localhost:9696/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("Result:", result);
+
+        if (result.condition) {
+          resultEl.textContent = `✅ Machine is LIKELY TO FAIL (${(result.condition_probability * 100).toFixed(1)}%)`;
+          resultEl.classList.add("bad");
+        } else {
+          resultEl.textContent = `✓ Machine is OK (Failure probability: ${(result.condition_probability * 100).toFixed(1)}%)`;
+          resultEl.classList.add("good");
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        resultEl.textContent = `⚠️ Error: ${err.message}`;
+        resultEl.classList.add("bad");
+      }
+    });
+  </script>
+</body>
+</html>

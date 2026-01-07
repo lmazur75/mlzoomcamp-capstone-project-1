@@ -16,7 +16,7 @@ ENV PATH="/code/.venv/bin:$PATH"
 # pyproject.toml     → project metadata and dependencies
 # uv.lock            → locked dependency versions (for reproducibility)
 # .python-version    → Python version specification
-COPY "pyproject.toml" "uv.lock" ".python-version" ./
+COPY "pyproject.toml" "uv.lock" ./
 
 # Install dependencies exactly as locked in uv.lock, without updating them
 RUN uv lock && uv sync --locked

@@ -1,20 +1,24 @@
-# Engine Health Prediction Project
+# Machine Failure Prediction Project
 
 ## Description of the Problem
 
-This project focuses on predicting the health condition of automotive vehicle engines using machine learning. The goal is to classify whether an engine is in good condition or requires maintenance based on various sensor readings and operational parameters.
+This project aims to build a machine learning model capable of
+predicting machine failures based on operational and process-related
+data. The goal is to anticipate failures before they occur, supporting
+preventive maintenance and reducing downtime.
+
+The project was developed as a capstone following best practices in data
+preparation, exploratory data analysis, model selection, and
+hyperparameter tuning.
 
 ### Dataset
-The project uses the **Automotive Vehicles Engine Health Dataset** which contains various engine parameters including:
-- Engine RPM
-- Lubricating oil pressure
-- Fuel pressure
-- Coolant pressure
-- Lubricating oil temperature
-- Coolant temperature
-- Engine Condition (target variable: 0 = needs maintenance, 1 = good condition)
+The dataset used comes from Kaggle:
 
-**Dataset Source**: [Automotive Vehicles Engine Health Dataset on Kaggle](https://www.kaggle.com/datasets/loveall/automotive-vehicles-engine-health-dataset)
+**Dataset Source**: [Machine Failure Predictions](https://www.kaggle.com/datasets/dineshmanikanta/machine-failure-predictions/data)
+
+The dataset contains numerical sensor readings and categorical
+attributes related to machine operation, along with a binary target
+variable indicating machine failure.
 
 ### Solution Approach
 The project implements a binary classification model using XGBoost, which achieved the best performance among several tested algorithms (Logistic Regression, Decision Tree, Random Forest, and XGBoost). The model can predict engine health with approximately 66.6% accuracy.
@@ -24,13 +28,13 @@ The project implements a binary classification model using XGBoost, which achiev
 ```
 ├── README.md
 ├── notebook.ipynb          # EDA and model selection
-├── train.py               # Training script
-├── predict.py             # FastAPI service for predictions
-├── Dockerfile             # Container configuration
-├── pyproject.toml         # Project dependencies (uv)
-├── uv.lock               # Locked dependencies
-├── engine_data.csv       # Dataset
-└── model.bin             # Trained model
+├── index.html              # Simple web page
+├── predict.py              # FastAPI service for predictions
+├── Dockerfile              # Container configuration
+├── pyproject.toml          # Project dependencies (uv)
+├── uv.lock                 # Locked dependencies
+├── machine_failure.csv     # Dataset
+└── model.bin               # Trained model
 ```
 
 ## Installation and Setup
@@ -56,8 +60,8 @@ pip install uv
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/lmazur75/mlzoomcamp-midterm-project
-cd mlzoomcamp-midterm-project
+git clone https://github.com/lmazur75/mlzoomcamp-capstone-project-1
+cd mlzoomcamp-capstone-project-1
 ```
 
 2. **Create virtual environment and install dependencies**
@@ -75,20 +79,24 @@ uv pip sync
 ### Option 2: Using Docker
 
 ```bash
-docker build --no-cache --progress=plain -t predict-engine-condition .
-docker run -p 9696:9696 predict-engine-condition
+docker build --no-cache --progress=plain -t predict-machine-failure .
+docker run -p 9696:9696 predict-machine-failure
 ```
 
 ## How to Download the Dataset
 
-1. Visit [Kaggle Dataset Page](https://www.kaggle.com/datasets/loveall/automotive-vehicles-engine-health-dataset)
-2. Download `engine_data.csv`
+1. Visit [Kaggle Dataset Page](https://www.kaggle.com/datasets/dineshmanikanta/machine-failure-predictions/data)
+2. Download `machine_failure.csv`
 3. Place it in the project root directory
 
 Alternatively, use Kaggle API:
-```bash
-kaggle datasets download -d loveall/automotive-vehicles-engine-health-dataset
-unzip automotive-vehicles-engine-health-dataset.zip
+```
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("dineshmanikanta/machine-failure-predictions")
+
+print("Path to dataset files:", path)
 ```
 
 ## Usage
@@ -97,13 +105,14 @@ unzip automotive-vehicles-engine-health-dataset.zip
 
 Train the model from scratch:
 
-```bash
-python train.py
+On Jupyter notebook:
+```
+Open notebook.ipynb and run all cells.
 ```
 
 This will:
 - Load and preprocess the data
-- Train the XGBoost model with optimized hyperparameters
+- Train the model with optimized hyperparameters
 - Save the model to `model.bin`
 - Display training metrics
 
@@ -134,12 +143,17 @@ The service will be available at:
 curl -X POST http://localhost:9696/predict \
   -H "Content-Type: application/json" \
   -d '{
-    "engine_rpm": 700,
-    "lub_oil_pressure": 2.5,
-    "fuel_pressure": 11.8,
-    "coolant_pressure": 3.2,
-    "lub_oil_temp": 84.1,
-    "coolant_temp": 81.6
+    "twf": 0,
+    "hdf": 0,
+    "pwf": 0,
+    "osf": 1,
+    "rnf": 0,
+    "torque_[nm]": 40.0,
+    "tool_wear_[min]": 100,
+    "air_temperature_[k]": 300.0,
+    "process_temperature_[k]": 310.0,
+    "rotational_speed_[rpm]": 1500,
+    "type": "L"
   }'
 ```
 
@@ -149,12 +163,17 @@ curl -X POST http://localhost:9696/predict \
 import requests
 
 data = {
-    "engine_rpm": 700,
-    "lub_oil_pressure": 2.5,
-    "fuel_pressure": 11.8,
-    "coolant_pressure": 3.2,
-    "lub_oil_temp": 84.1,
-    "coolant_temp": 81.6
+    "twf": 0,
+    "hdf": 0,
+    "pwf": 0,
+    "osf": 1,
+    "rnf": 0,
+    "torque_[nm]": 40.0,
+    "tool_wear_[min]": 100,
+    "air_temperature_[k]": 300.0,
+    "process_temperature_[k]": 310.0,
+    "rotational_speed_[rpm]": 1500,
+    "type": "L"
 }
 
 response = requests.post('http://localhost:9696/predict', json=data)
@@ -173,45 +192,32 @@ print(response.json())
 
 ```json
 {
-  "prediction": 1,
-  "condition": "Good",
-  "confidence": 0.85,
-  "input_data": {
-    "engine_rpm": 700,
-    "lub_oil_pressure": 2.5,
-    "fuel_pressure": 11.8,
-    "coolant_pressure": 3.2,
-    "lub_oil_temp": 84.1,
-    "coolant_temp": 81.6
-  }
+  "condition_probability": 0.00017029973969329149,
+  "condition": false
 }
 ```
 
-- `prediction`: 0 (maintenance needed) or 1 (good condition)
+- `condition_probability`: 0 (GOOD) or 1 (BAD)
 - `condition`: Human-readable status
-- `confidence`: Model confidence score
-- `input_data`: Echo of the input parameters
 
 ## Model Performance
 
 Based on the test set evaluation:
 
-| Model | Test Accuracy | Test Precision | Test Recall | Test F1 | Test ROC-AUC |
-|-------|---------------|----------------|-------------|---------|--------------|
-| XGBoost | 0.6660 | 0.6502 | 0.6660 | 0.6457 | 0.7019 |
-| Random Forest | 0.6627 | 0.6458 | 0.6627 | 0.6395 | 0.6989 |
-| Logistic Regression | 0.6611 | 0.6434 | 0.6611 | 0.6261 | 0.6918 |
-| Decision Tree | 0.6598 | 0.6427 | 0.6598 | 0.6382 | 0.6822 |
+| Model | Test Accuracy | Test F1 | Test ROC-AUC |
+|-------|---------------|---------|--------------|
+| XGBoost | 0.9980 | 0.9697 | 0.9956
+| Decision Tree | 0.9990 | 0.9851 | 0.9886
+| Random Forest | 0.9990 | 0.9851 | 0.9837
+| Logistic Regression | 0.9990 | 0.9851 | 0.9728
 
 ### Feature Importance
 
 The most important features for prediction (XGBoost):
-1. **Engine RPM** (51.44%)
-2. **Fuel Pressure** (17.43%)
-3. **Lubricating Oil Temperature** (10.38%)
-4. **Lubricating Oil Pressure** (8.83%)
-5. **Coolant Pressure** (6.34%)
-6. **Coolant Temperature** (5.59%)
+1. **hdf** (29.04%)
+2. **osf** (21.65%)
+3. **pwf** (21.47%)
+4. **twf** (18.37%)
 
 ## Docker Deployment
 
